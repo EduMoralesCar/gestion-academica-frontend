@@ -27,30 +27,88 @@ export default function MiPerfilPage() {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error('La imagen no debe superar los 2MB');
-        return;
-      }
       const reader = new FileReader();
       reader.onloadend = () => {
-        const base64String = reader.result as string;
-        
-        const updatedUsers = appState.usuarios.map(u => 
-          u.id === userId ? { ...u, profilePicture: base64String } : u
-        );
-        updateAppState({ usuarios: updatedUsers });
-        
-        if (user) {
-          updateUser({ ...user, profilePicture: base64String });
-        }
-        
-        toast.success('Foto de perfil actualizada');
+        const img = new (window as any).Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const max_size = 200; // Suficiente para un avatar redondo
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > max_size) {
+              height *= max_size / width;
+              width = max_size;
+            }
+          } else {
+            if (height > max_size) {
+              width *= max_size / height;
+              height = max_size;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+            
+            if (!user) return;
+            
+            const token = typeof window !== 'undefined' ? localStorage.getItem('nuevaschool_token') : null;
+            
+            // Realizar la actualización directamente en el servidor
+            fetch(`/api/usuarios/${userId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                email: user.email,
+                nombre: user.nombre,
+                apellido: user.apellido,
+                rol: user.rol,
+                profilePicture: compressedBase64,
+                codigo: (user as any).codigo || null,
+                carrera: (user as any).carrera || null,
+                ciclo: (user as any).ciclo ? Number((user as any).ciclo) : null,
+                especialidad: (user as any).especialidad || null,
+                departamento: (user as any).departamento || null,
+                nivel_acceso: (user as any).nivel_acceso || null
+              })
+            }).then(async (res) => {
+              if (res.ok) {
+                // Actualizar el estado global en memoria de usuarios si está cargado
+                if (appState.usuarios && appState.usuarios.length > 0) {
+                  const updatedUsers = appState.usuarios.map(u => 
+                    u.id === userId ? { ...u, profilePicture: compressedBase64 } : u
+                  );
+                  updateAppState({ usuarios: updatedUsers });
+                }
+                
+                // Actualizar el usuario de sesión
+                updateUser({ ...user, profilePicture: compressedBase64 });
+                toast.success('Foto de perfil actualizada y optimizada');
+              } else {
+                const errData = await res.json().catch(() => ({}));
+                toast.error(errData.detail || 'No se pudo guardar la foto de perfil en el servidor');
+              }
+            }).catch((err) => {
+              console.error('Error uploading photo:', err);
+              toast.error('Error de conexión al guardar la foto de perfil');
+            });
+          }
+        };
+        img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleUpdatePassword = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (showValidation(validatePasswordChange(newPassword, confirmPassword, currentPassword, true))) return;
 
@@ -64,23 +122,46 @@ export default function MiPerfilPage() {
       return;
     }
 
-    // In a real app we'd verify currentPassword. For local simulation, we just update it.
-    // However, let's update it in appState:
-    const updatedUsers = appState.usuarios.map(u => {
-      // If we had a password field, we would update it here.
-      // Usually auth ignores password for dummy data or stores it in seedData but we don't have password visible in `types.User`.
-      // Let's pretend to save it:
-      return u.id === userId ? { ...u, password: newPassword } : u;
-    });
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('nuevaschool_token') : null;
+      const res = await fetch('/api/auth/change-password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          contrasenia_actual: currentPassword,
+          nueva_contrasenia: newPassword
+        })
+      });
 
-    updateAppState({ usuarios: updatedUsers });
-    toast.success('Contraseña actualizada correctamente');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ detail: 'La contraseña actual es incorrecta' }));
+        toast.error(errorData.detail || 'La contraseña actual es incorrecta');
+        return;
+      }
+
+      toast.success('Contraseña actualizada correctamente');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      console.error('Error updating password:', error);
+      toast.error('Error de conexión al actualizar la contraseña');
+    }
   };
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-900 border-t-transparent"></div>
+          <span className="ml-3 text-gray-600 font-medium">Cargando perfil...</span>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -162,7 +243,7 @@ export default function MiPerfilPage() {
           <CardContent>
             <form onSubmit={handleUpdatePassword} className="space-y-4">
               <div>
-                <label className="text-sm font-medium">Contraseña Actual (Simulada)</label>
+                <label className="text-sm font-medium">Contraseña Actual</label>
                 <Input 
                   type="password" 
                   value={currentPassword}
