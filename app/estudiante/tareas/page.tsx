@@ -75,12 +75,12 @@ export default function TareasPage() {
   const getEstadoEntrega = (tareaId: string) => {
     const entrega = entregas.find(e => e.tarea_id === tareaId);
     if (!entrega) return null;
-    return entrega.calificacion !== null ? 'calificada' : 'pendiente';
+    return (entrega.calificacion !== null && entrega.calificacion > 0) ? 'calificada' : 'pendiente';
   };
 
   return (
     <MainLayout>
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Mis Tareas</h1>
           <p className="text-gray-500 mt-1">Tareas de tus cursos matriculados</p>
@@ -188,7 +188,7 @@ export default function TareasPage() {
                     <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mt-4">
                       <div className="flex justify-between">
                         <p className="text-sm font-medium text-blue-900">
-                          Estado: {tarea.entrega.calificacion !== null ? `Calificada (${tarea.entrega.calificacion}/${tarea.puntaje_total})` : 'Pendiente de revisión'}
+                          Estado: {tarea.entrega.calificacion !== null && tarea.entrega.calificacion > 0 ? `Calificada (${tarea.entrega.calificacion}/20)` : 'Pendiente de revisión'}
                         </p>
                         <a href={tarea.entrega.archivo} download={"Entrega - " + tarea.titulo} className="text-xs text-blue-600 hover:underline">
                           📎 Descargar mi entrega
