@@ -28,7 +28,7 @@ export const seedData: AppState = {
     } as Docente,
     {
       id: 'docente-2',
-      email: 'docente2@nuevaschool.pe',
+      email: 'd.maria.garcia@nuevaschool.pe',
       nombre: 'María',
       apellido: 'García',
       rol: UserRole.DOCENTE,
@@ -39,7 +39,7 @@ export const seedData: AppState = {
     } as Docente,
     {
       id: 'docente-3',
-      email: 'docente3@nuevaschool.pe',
+      email: 'd.luis.lopez@nuevaschool.pe',
       nombre: 'Luis',
       apellido: 'López',
       rol: UserRole.DOCENTE,
@@ -64,7 +64,7 @@ export const seedData: AppState = {
     } as Estudiante,
     {
       id: 'estudiante-2',
-      email: 'ana@nuevaschool.pe',
+      email: 'e.ana.martinez@nuevaschool.pe',
       nombre: 'Ana',
       apellido: 'Martínez',
       rol: UserRole.ESTUDIANTE,
@@ -76,7 +76,7 @@ export const seedData: AppState = {
     } as Estudiante,
     {
       id: 'estudiante-3',
-      email: 'carlos@nuevaschool.pe',
+      email: 'e.carlos.lopez@nuevaschool.pe',
       nombre: 'Carlos',
       apellido: 'López',
       rol: UserRole.ESTUDIANTE,
@@ -88,7 +88,7 @@ export const seedData: AppState = {
     } as Estudiante,
     {
       id: 'estudiante-4',
-      email: 'diana@nuevaschool.pe',
+      email: 'e.diana.soto@nuevaschool.pe',
       nombre: 'Diana',
       apellido: 'Soto',
       rol: UserRole.ESTUDIANTE,
@@ -100,7 +100,7 @@ export const seedData: AppState = {
     } as Estudiante,
     {
       id: 'estudiante-5',
-      email: 'gabriel@nuevaschool.pe',
+      email: 'e.gabriel.quispe@nuevaschool.pe',
       nombre: 'Gabriel',
       apellido: 'Quispe',
       rol: UserRole.ESTUDIANTE,
@@ -112,7 +112,7 @@ export const seedData: AppState = {
     } as Estudiante,
     {
       id: 'estudiante-6',
-      email: 'francisco@nuevaschool.pe',
+      email: 'e.francisco.flores@nuevaschool.pe',
       nombre: 'Francisco',
       apellido: 'Flores',
       rol: UserRole.ESTUDIANTE,
@@ -124,7 +124,7 @@ export const seedData: AppState = {
     } as Estudiante,
     {
       id: 'estudiante-7',
-      email: 'gloria@nuevaschool.pe',
+      email: 'e.gloria.ruiz@nuevaschool.pe',
       nombre: 'Gloria',
       apellido: 'Ruiz',
       rol: UserRole.ESTUDIANTE,
@@ -136,7 +136,7 @@ export const seedData: AppState = {
     } as Estudiante,
     {
       id: 'estudiante-8',
-      email: 'hernan@nuevaschool.pe',
+      email: 'e.hernan.mendoza@nuevaschool.pe',
       nombre: 'Hernán',
       apellido: 'Mendoza',
       rol: UserRole.ESTUDIANTE,
@@ -148,7 +148,7 @@ export const seedData: AppState = {
     } as Estudiante,
     {
       id: 'estudiante-9',
-      email: 'iris@nuevaschool.pe',
+      email: 'e.iris.condori@nuevaschool.pe',
       nombre: 'Iris',
       apellido: 'Condori',
       rol: UserRole.ESTUDIANTE,
@@ -160,7 +160,7 @@ export const seedData: AppState = {
     } as Estudiante,
     {
       id: 'estudiante-10',
-      email: 'jose@nuevaschool.pe',
+      email: 'e.jose.torres@nuevaschool.pe',
       nombre: 'José',
       apellido: 'Torres',
       rol: UserRole.ESTUDIANTE,
