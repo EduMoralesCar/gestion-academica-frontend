@@ -35,9 +35,10 @@ export default function GestionUsuariosPage() {
   
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [emailManuallyEdited, setEmailManuallyEdited] = useState(false);
   
   // Filter for tab-like toggle
-  const [activeRole, setActiveRole] = useState<'ESTUDIANTE' | 'DOCENTE'>('ESTUDIANTE');
+  const [activeRole, setActiveRole] = useState<'ESTUDIANTE' | 'DOCENTE' | 'ADMIN'>('ESTUDIANTE');
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -52,8 +53,29 @@ export default function GestionUsuariosPage() {
     codigo: '',
     // Docente specific
     especialidad: '',
-    departamento: ''
+    departamento: '',
+    // Admin specific
+    nivel_acceso: ''
   });
+
+  const generateEmailFromName = (nombre: string, apellido: string, rol: string) => {
+    if (!nombre.trim() && !apellido.trim()) return '';
+    const clean = (str: string) => {
+      const parts = str.trim().toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/);
+      return parts[0] || '';
+    };
+    const prefix = rol === 'ADMIN' ? 'a' : rol === 'DOCENTE' ? 'd' : 'e';
+    const n = clean(nombre);
+    const a = clean(apellido);
+    if (n && a) return `${prefix}.${n}.${a}@nuevaschool.pe`;
+    if (n) return `${prefix}.${n}@nuevaschool.pe`;
+    if (a) return `${prefix}.${a}@nuevaschool.pe`;
+    return '';
+  };
 
   const getFilteredUsers = () => {
     return (appState.usuarios || []).filter(u => u.rol === activeRole);
@@ -80,8 +102,10 @@ export default function GestionUsuariosPage() {
 
     if (formData.rol === 'ESTUDIANTE') {
       userObj = { ...userObj, carrera: formData.carrera, ciclo: parseInt(formData.ciclo), codigo: formData.codigo };
-    } else {
+    } else if (formData.rol === 'DOCENTE') {
       userObj = { ...userObj, especialidad: formData.especialidad, departamento: formData.departamento };
+    } else if (formData.rol === 'ADMIN') {
+      userObj = { ...userObj, nivel_acceso: formData.nivel_acceso };
     }
 
     if (editingId) {
@@ -106,20 +130,46 @@ export default function GestionUsuariosPage() {
   };
 
   const resetForm = () => {
-    setFormData({nombre: '', apellido: '', email: '', password: '', rol: activeRole, profilePicture: '', carrera: '', ciclo: '1', codigo: '', especialidad: '', departamento: ''});
+    setFormData({nombre: '', apellido: '', email: '', password: '', rol: activeRole, profilePicture: '', carrera: '', ciclo: '1', codigo: '', especialidad: '', departamento: '', nivel_acceso: ''});
     setEditingId(null);
+    setEmailManuallyEdited(false);
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error('La imagen no debe superar los 2MB');
-        return;
-      }
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData({ ...formData, profilePicture: reader.result as string });
+        const img = new (window as any).Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const max_size = 200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > max_size) {
+              height *= max_size / width;
+              width = max_size;
+            }
+          } else {
+            if (height > max_size) {
+              width *= max_size / height;
+              height = max_size;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+            setFormData({ ...formData, profilePicture: compressedBase64 });
+            toast.success('Imagen optimizada correctamente');
+          }
+        };
+        img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
     }
@@ -137,9 +187,11 @@ export default function GestionUsuariosPage() {
       ciclo: user.ciclo?.toString() || '1',
       codigo: user.codigo || '',
       especialidad: user.especialidad || '',
-      departamento: user.departamento || ''
+      departamento: user.departamento || '',
+      nivel_acceso: user.nivel_acceso || ''
     });
     setEditingId(user.id);
+    setEmailManuallyEdited(true);
     setIsOpen(true);
   };
 
@@ -161,7 +213,7 @@ export default function GestionUsuariosPage() {
       <div className="p-6 space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Gestión de Usuarios</h1>
-          <p className="text-gray-500 mt-1">Crea, edita o elimina cuentas de estudiantes y docentes.</p>
+          <p className="text-gray-500 mt-1">Crea, edita o elimina cuentas de estudiantes, docentes y administradores.</p>
         </div>
 
         <Card>
@@ -180,6 +232,12 @@ export default function GestionUsuariosPage() {
                 >
                   Docentes
                 </button>
+                <button 
+                  onClick={() => setActiveRole('ADMIN')}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeRole === 'ADMIN' ? 'bg-white text-blue-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  Administradores
+                </button>
               </div>
 
               <Dialog open={isOpen} onOpenChange={(open) => {
@@ -190,7 +248,7 @@ export default function GestionUsuariosPage() {
                 <DialogTrigger asChild>
                   <Button className="bg-blue-900">
                     <Plus className="w-4 h-4 mr-2" />
-                    Añadir {activeRole === 'ESTUDIANTE' ? 'Estudiante' : 'Docente'}
+                    Añadir {activeRole === 'ESTUDIANTE' ? 'Estudiante' : activeRole === 'DOCENTE' ? 'Docente' : 'Administrador'}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-xl">
@@ -205,15 +263,54 @@ export default function GestionUsuariosPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium">Nombre</label>
-                        <Input required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="mt-1" />
+                        <Input 
+                          required 
+                          value={formData.nombre} 
+                          onChange={e => {
+                            const nameVal = e.target.value;
+                            setFormData(prev => {
+                              const nextFormData = { ...prev, nombre: nameVal };
+                              if (!editingId && !emailManuallyEdited) {
+                                nextFormData.email = generateEmailFromName(nameVal, prev.apellido, prev.rol);
+                              }
+                              return nextFormData;
+                            });
+                          }} 
+                          className="mt-1" 
+                        />
                       </div>
                       <div>
                         <label className="text-sm font-medium">Apellido</label>
-                        <Input required value={formData.apellido} onChange={e => setFormData({...formData, apellido: e.target.value})} className="mt-1" />
+                        <Input 
+                          required 
+                          value={formData.apellido} 
+                          onChange={e => {
+                            const surnameVal = e.target.value;
+                            setFormData(prev => {
+                              const nextFormData = { ...prev, apellido: surnameVal };
+                              if (!editingId && !emailManuallyEdited) {
+                                nextFormData.email = generateEmailFromName(prev.nombre, surnameVal, prev.rol);
+                              }
+                              return nextFormData;
+                            });
+                          }} 
+                          className="mt-1" 
+                        />
                       </div>
                       <div className="col-span-2">
                         <label className="text-sm font-medium">Correo Electrónico (Login)</label>
-                        <Input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="mt-1" />
+                        <Input 
+                          type="email" 
+                          required 
+                          value={formData.email} 
+                          onChange={e => {
+                            setFormData({...formData, email: e.target.value});
+                            if (!editingId) {
+                              setEmailManuallyEdited(true);
+                            }
+                          }} 
+                          className="mt-1" 
+                        />
                       </div>
                       {!editingId && (
                         <div className="col-span-2">
@@ -262,6 +359,15 @@ export default function GestionUsuariosPage() {
                       </div>
                     )}
 
+                    {formData.rol === 'ADMIN' && (
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                        <div className="col-span-2">
+                          <label className="text-sm font-medium">Nivel de Acceso</label>
+                          <Input required value={formData.nivel_acceso} onChange={e => setFormData({...formData, nivel_acceso: e.target.value})} placeholder="Ej: super, coordinador, soporte" className="mt-1" />
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex justify-end gap-3 pt-6">
                       <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
                       <Button type="submit" className="bg-blue-900">{editingId ? 'Actualizar' : 'Crear Usuario'}</Button>
@@ -282,13 +388,14 @@ export default function GestionUsuariosPage() {
                         {activeRole === 'ESTUDIANTE' && <th className="px-4 py-3">Carrera</th>}
                         {activeRole === 'ESTUDIANTE' && <th className="px-4 py-3">Ciclo</th>}
                         {activeRole === 'DOCENTE' && <th className="px-4 py-3">Especialidad</th>}
+                        {activeRole === 'ADMIN' && <th className="px-4 py-3">Nivel Acceso</th>}
                         <th className="px-4 py-3">Estado</th>
                         <th className="px-4 py-3 rounded-tr-lg text-right">Acciones</th>
                      </tr>
                   </thead>
                   <tbody>
                      {getFilteredUsers()?.length === 0 ? (
-                       <tr><td colSpan={6} className="py-8 text-center text-gray-400">No se encontraron usuarios</td></tr>
+                       <tr><td colSpan={activeRole === 'ESTUDIANTE' ? 7 : 6} className="py-8 text-center text-gray-400">No se encontraron usuarios</td></tr>
                      ) : (
                        getFilteredUsers()?.map((u: any) => (
                          <tr key={u.id} className="bg-white border-b hover:bg-gray-50">
@@ -297,6 +404,7 @@ export default function GestionUsuariosPage() {
                            {activeRole === 'ESTUDIANTE' && <td className="px-4 py-3">{u.carrera}</td>}
                            {activeRole === 'ESTUDIANTE' && <td className="px-4 py-3"><span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Ciclo {u.ciclo}</span></td>}
                            {activeRole === 'DOCENTE' && <td className="px-4 py-3">{u.especialidad}</td>}
+                           {activeRole === 'ADMIN' && <td className="px-4 py-3"><span className="bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded capitalize">{u.nivel_acceso || 'Coordinador'}</span></td>}
                            <td className="px-4 py-3"><span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded capitalize">{u.estado}</span></td>
                            <td className="px-4 py-3 text-right">
                               <Button variant="ghost" size="icon" onClick={() => handleEdit(u)}>

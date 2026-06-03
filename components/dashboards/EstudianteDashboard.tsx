@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { useAppData } from '@/lib/hooks/useAppData';
 import { Estudiante } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { BookOpen, FileText, CheckSquare, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -35,7 +36,7 @@ export const EstudianteDashboard: React.FC = () => {
   const getCourseAverage = React.useCallback((matriculaId: string, cursoId: string) => {
     const notas = getNotasByMatricula(matriculaId);
     const tareas = getTareasByCurso(cursoId);
-    const entregasEstudiante = appState.entregas.filter(e => e.estudiante_id === estudiante.id && e.calificacion !== null && tareas.some(t => t.id === e.tarea_id));
+    const entregasEstudiante = appState.entregas.filter(e => e.estudiante_id === estudiante.id && e.calificacion !== null && e.calificacion > 0 && tareas.some(t => t.id === e.tarea_id));
 
     let puntajeObtenido = 0;
     let puntajePosible = 0;
@@ -69,55 +70,55 @@ export const EstudianteDashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-3">
-              <BookOpen className="h-6 w-6 text-blue-600" />
+        <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 border-slate-100 hover:border-blue-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-blue-600" />
               Mis Cursos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-extrabold">{totalCursos}</div>
-            <p className="text-sm text-gray-500">cursos matriculados</p>
+            <div className="text-3xl font-extrabold text-slate-900 leading-none">{totalCursos}</div>
+            <p className="text-[11px] font-medium text-slate-500 mt-1">cursos matriculados activos</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-3">
-              <CheckSquare className="h-6 w-6 text-green-600" />
+        <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 border-slate-100 hover:border-green-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+              <CheckSquare className="h-4 w-4 text-green-600" />
               Mis Tareas
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-extrabold">{totalTareas}</div>
-            <p className="text-sm text-gray-500">tareas pendientes</p>
+            <div className="text-3xl font-extrabold text-slate-900 leading-none">{totalTareas}</div>
+            <p className="text-[11px] font-medium text-slate-500 mt-1">tareas asignadas este ciclo</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-3">
-              <BarChart3 className="h-6 w-6 text-orange-600" />
-              Asistencia
+        <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 border-slate-100 hover:border-orange-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-orange-600" />
+              Asistencias
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-extrabold">{totalAsistencias}</div>
-            <p className="text-sm text-gray-500">registros</p>
+            <div className="text-3xl font-extrabold text-slate-900 leading-none">{totalAsistencias}</div>
+            <p className="text-[11px] font-medium text-slate-500 mt-1">registros de asistencia</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-3">
-              <FileText className="h-6 w-6 text-purple-600" />
+        <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 border-slate-100 hover:border-purple-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-purple-600" />
               Promedio
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-extrabold">{generalAverage.toFixed(1)}</div>
-            <p className="text-sm text-gray-500">promedio general actual</p>
+            <div className="text-3xl font-extrabold text-slate-900 leading-none">{generalAverage.toFixed(1)}</div>
+            <p className="text-[11px] font-medium text-purple-600 mt-1">promedio ponderado general</p>
           </CardContent>
         </Card>
       </div>
@@ -142,9 +143,11 @@ export const EstudianteDashboard: React.FC = () => {
                         <h3 className="font-medium text-gray-900">{curso?.nombre}</h3>
                         <p className="text-sm text-gray-500">{curso?.codigo} • {curso?.creditos} créditos</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-blue-600">{avg.toFixed(1)}</p>
-                        <p className="text-xs text-gray-500">promedio</p>
+                      <div className="text-right flex flex-col items-end gap-1">
+                        <p className="text-sm font-bold text-blue-600">Prom: {avg.toFixed(1)}</p>
+                        <Badge className={avg >= 11.5 ? "bg-green-100 text-green-800 border-green-300 font-medium px-2 py-0.5 text-[10px]" : "bg-red-100 text-red-800 border-red-300 font-medium px-2 py-0.5 text-[10px]"} variant="outline">
+                          {avg >= 11.5 ? "Aprobado" : "Desaprobado"}
+                        </Badge>
                       </div>
                     </div>
                   </Link>

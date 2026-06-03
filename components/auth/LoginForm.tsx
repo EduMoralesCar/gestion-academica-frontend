@@ -32,19 +32,17 @@ export const LoginForm: React.FC = () => {
   const [resetStep, setResetStep] = useState(1);
   const [resetEmail, setResetEmail] = useState('');
   const [resetCode, setResetCode] = useState('');
-  const [expectedCode, setExpectedCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [resettingUser, setResettingUser] = useState<any>(null);
+  const [isLoadingReset, setIsLoadingReset] = useState(false);
 
   const resetRecovery = () => {
     setResetStep(1);
     setResetEmail('');
     setResetCode('');
-    setExpectedCode('');
     setNewPassword('');
     setConfirmPassword('');
-    setResettingUser(null);
+    setIsLoadingReset(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,40 +70,76 @@ export const LoginForm: React.FC = () => {
     }
   };
 
-  const handleSendCode = () => {
+  const handleSendCode = async () => {
     const result = validateRecoveryEmail(resetEmail, appState.usuarios || []);
     if (showValidation(result)) return;
 
-    const user = (appState.usuarios || []).find((item) => item.email.toLowerCase() === resetEmail.trim().toLowerCase());
-    setResettingUser(user);
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setExpectedCode(code);
-    toast.success(`Código de recuperación generado para ${resetEmail} (DEMO: ${code})`, { duration: 10000 });
-    setResetStep(2);
+    setIsLoadingReset(true);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail.trim() }),
+      });
+      if (res.ok) {
+        toast.success('Se ha enviado un código de recuperación a tu correo');
+        setResetStep(2);
+      } else {
+        const err = await res.json();
+        let errMsg = 'Error al enviar el código de recuperación';
+        if (err && err.detail) {
+          errMsg = Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(', ') : err.detail;
+        }
+        showValidation(invalid('No se pudo enviar el código', [errMsg]));
+      }
+    } catch (err) {
+      showValidation(invalid('Error de conexión', ['No se pudo comunicar con el servidor. Intenta de nuevo.']));
+    } finally {
+      setIsLoadingReset(false);
+    }
   };
 
   const handleVerifyCode = () => {
-    if (showValidation(validateRecoveryCode(resetCode, expectedCode))) return;
-    toast.success('Código verificado correctamente');
+    if (!/^\d{6}$/.test(resetCode.trim())) {
+      showValidation(invalid('Código de recuperación inválido', ['El código debe tener exactamente 6 dígitos.']));
+      return;
+    }
+    toast.success('Formato de código correcto');
     setResetStep(3);
   };
 
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
     if (showValidation(validatePasswordChange(newPassword, confirmPassword))) return;
-    if (!resettingUser) {
-      showValidation(invalid('No se encontró la cuenta', ['Vuelve a iniciar el proceso de recuperación.']));
-      return;
+
+    setIsLoadingReset(true);
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: resetEmail.trim(),
+          codigo: resetCode.trim(),
+          nueva_contrasenia: newPassword,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success('Contraseña restablecida correctamente');
+        setIsResetOpen(false);
+        resetRecovery();
+      } else {
+        const err = await res.json();
+        let errMsg = 'Error al restablecer la contraseña';
+        if (err && err.detail) {
+          errMsg = Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg).join(', ') : err.detail;
+        }
+        showValidation(invalid('Error al restablecer la contraseña', [errMsg]));
+      }
+    } catch (err) {
+      showValidation(invalid('Error de conexión', ['No se pudo comunicar con el servidor. Intenta de nuevo.']));
+    } finally {
+      setIsLoadingReset(false);
     }
-
-    updateAppState({
-      usuarios: (appState.usuarios || []).map((item) =>
-        item.id === resettingUser.id ? { ...item, password: newPassword } : item,
-      ),
-    });
-
-    toast.success('Contraseña actualizada exitosamente');
-    setIsResetOpen(false);
-    resetRecovery();
   };
 
   return (
@@ -163,7 +197,6 @@ export const LoginForm: React.FC = () => {
                   />
                   <Mail className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-600" />
                 </div>
-                <p className="text-xs text-slate-500">Demo: admin@nuevaschool.pe, docente@nuevaschool.pe o estudiante@nuevaschool.pe</p>
               </div>
 
               <div className="space-y-2">
@@ -209,13 +242,6 @@ export const LoginForm: React.FC = () => {
                   'Iniciar sesión'
                 )}
               </Button>
-
-              <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-950">
-                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" />
-                <p>
-                  Este prototipo trabaja con datos locales del navegador para simular la experiencia antes de conectar una base de datos real.
-                </p>
-              </div>
             </form>
           </div>
         </section>
@@ -232,9 +258,9 @@ export const LoginForm: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Recuperar contraseña</DialogTitle>
             <DialogDescription>
-              {resetStep === 1 && 'Ingresa tu correo institucional para generar un código de seguridad de demostración.'}
-              {resetStep === 2 && 'Ingresa el código de 6 dígitos que se generó para esta demo.'}
-              {resetStep === 3 && 'Crea una nueva contraseña para tu cuenta local.'}
+              {resetStep === 1 && 'Ingresa tu correo institucional para recibir un código de seguridad.'}
+              {resetStep === 2 && 'Ingresa el código de 6 dígitos enviado a tu correo.'}
+              {resetStep === 3 && 'Crea una nueva contraseña para tu cuenta.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -247,9 +273,19 @@ export const LoginForm: React.FC = () => {
                     placeholder="usuario@nuevaschool.pe"
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
+                    disabled={isLoadingReset}
                   />
                 </div>
-                <Button className="w-full bg-blue-900" onClick={handleSendCode}>Enviar código</Button>
+                <Button className="w-full bg-blue-900" onClick={handleSendCode} disabled={isLoadingReset}>
+                  {isLoadingReset ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Enviando código...
+                    </>
+                  ) : (
+                    'Enviar código'
+                  )}
+                </Button>
               </>
             )}
 
@@ -263,9 +299,12 @@ export const LoginForm: React.FC = () => {
                     value={resetCode}
                     onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
                     className="text-center text-lg font-bold tracking-[0.5em]"
+                    disabled={isLoadingReset}
                   />
                 </div>
-                <Button className="w-full bg-blue-900" onClick={handleVerifyCode}>Verificar código</Button>
+                <Button className="w-full bg-blue-900" onClick={handleVerifyCode} disabled={isLoadingReset}>
+                  Verificar código
+                </Button>
               </>
             )}
 
@@ -278,6 +317,7 @@ export const LoginForm: React.FC = () => {
                     placeholder="Mínimo 6 caracteres"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
+                    disabled={isLoadingReset}
                   />
                 </div>
                 <div className="space-y-2">
@@ -287,9 +327,19 @@ export const LoginForm: React.FC = () => {
                     placeholder="Repite la contraseña"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={isLoadingReset}
                   />
                 </div>
-                <Button className="w-full bg-blue-900" onClick={handleResetPassword}>Actualizar contraseña</Button>
+                <Button className="w-full bg-blue-900" onClick={handleResetPassword} disabled={isLoadingReset}>
+                  {isLoadingReset ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Actualizando contraseña...
+                    </>
+                  ) : (
+                    'Actualizar contraseña'
+                  )}
+                </Button>
               </>
             )}
           </div>

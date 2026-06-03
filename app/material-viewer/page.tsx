@@ -206,6 +206,28 @@ export default function MaterialViewerPage() {
       const id = params.get('id');
 
       if (contentId) {
+        try {
+          const token = typeof window !== 'undefined' ? localStorage.getItem('nuevaschool_token') : null;
+          const res = await fetch('/api/contenidos/', {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          });
+          if (res.ok) {
+            const contenidos = await res.json();
+            const contenido = contenidos.find((item: any) => item.id === contentId);
+            if (contenido && contenido.archivo_url) {
+              setMaterial({
+                fileName: contenido.titulo || 'Documento adjunto',
+                fileData: contenido.archivo_url,
+                downloadName: contenido.titulo || 'material',
+              });
+              return;
+            }
+          }
+        } catch (fetchErr) {
+          console.warn('Error fetching material from API, falling back to localforage:', fetchErr);
+        }
+
+        // Fallback to localforage
         localforage.config({ name: 'NuevaSchoolDB', storeName: 'appstate' });
         const appState = await localforage.getItem<AppState>('nuevaschool_appstate_v2');
         const contenido = appState?.contenidos?.find((item) => item.id === contentId);

@@ -13,7 +13,7 @@ export default function DashboardPage() {
 
   return (
     <MainLayout>
-      <div className="p-6">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
         {user?.rol === UserRole.ESTUDIANTE && <EstudianteDashboard />}
         {user?.rol === UserRole.DOCENTE && <DocenteDashboard />}
         {user?.rol === UserRole.ADMIN && <AdminDashboard />}

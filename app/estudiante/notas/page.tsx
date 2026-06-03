@@ -18,7 +18,7 @@ export default function NotasPage() {
 
   return (
     <MainLayout>
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Mis Notas</h1>
           <p className="text-gray-500 mt-1">Consulta tus calificaciones por curso</p>
@@ -38,7 +38,7 @@ export default function NotasPage() {
 
               // Tareas
               const tareas = getTareasByCurso(curso!.id);
-              const entregasDeTareas = entregasEstudiante.filter(e => e.calificacion !== null && tareas.some(t => t.id === e.tarea_id));
+              const entregasDeTareas = entregasEstudiante.filter(e => e.calificacion !== null && e.calificacion > 0 && tareas.some(t => t.id === e.tarea_id));
               const puntajeObtenido = entregasDeTareas.reduce((sum, e) => sum + (e.calificacion || 0), 0);
               const puntajePosible = entregasDeTareas.reduce((sum, e) => {
                 const t = tareas.find(t => t.id === e.tarea_id);
@@ -57,12 +57,19 @@ export default function NotasPage() {
 
               const promedioFinal = (promedioTareas * 0.20) + (promedioPCs * 0.30) + (parcial * 0.20) + (final * 0.30);
 
+              const aprobado = promedioFinal >= 11.5;
+
               return (
                 <Card key={mat.id}>
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle>{curso?.nombre}</CardTitle>
+                        <CardTitle className="flex items-center gap-2 flex-wrap">
+                          {curso?.nombre}
+                          <Badge className={aprobado ? "bg-green-100 text-green-800 border-green-300 font-medium px-2 py-0.5 text-xs" : "bg-red-100 text-red-800 border-red-300 font-medium px-2 py-0.5 text-xs"} variant="outline">
+                            {aprobado ? "Aprobado" : "Desaprobado"}
+                          </Badge>
+                        </CardTitle>
                         <CardDescription>{curso?.codigo}</CardDescription>
                       </div>
                       <Badge className="bg-blue-900 text-lg py-1">Promedio: {promedioFinal.toFixed(1)}</Badge>

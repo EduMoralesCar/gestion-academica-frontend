@@ -59,13 +59,9 @@ export const validateLogin = (email: string, password: string): ValidationResult
 
 export const validateRecoveryEmail = (email: string, users: User[]): ValidationResult => {
   const messages: string[] = [];
-  const normalizedEmail = email.trim().toLowerCase();
 
   if (isBlank(email)) messages.push('Ingresa el correo de la cuenta que quieres recuperar.');
   else if (!isValidEmail(email)) messages.push('El correo no tiene un formato valido.');
-  else if (!users.some((user) => user.email.toLowerCase() === normalizedEmail)) {
-    messages.push('Ese correo no esta registrado en esta demo local.');
-  }
 
   return messages.length ? invalid('No se pudo enviar el código', messages) : ok();
 };
@@ -110,6 +106,7 @@ type UserFormData = {
   codigo: string;
   especialidad: string;
   departamento: string;
+  nivel_acceso?: string;
 };
 
 export const validateUserForm = (
@@ -148,6 +145,10 @@ export const validateUserForm = (
   if (formData.rol === UserRole.DOCENTE) {
     if (isBlank(formData.departamento)) messages.push('El departamento académico es obligatorio.');
     if (isBlank(formData.especialidad)) messages.push('La especialidad es obligatoria.');
+  }
+
+  if (formData.rol === UserRole.ADMIN) {
+    if (isBlank(formData.nivel_acceso || '')) messages.push('El nivel de acceso es obligatorio.');
   }
 
   return messages.length ? invalid('Revisa el formulario de usuario', messages) : ok();
@@ -234,7 +235,7 @@ export const validateGrade = (value: string, max = 20): ValidationResult => {
 
   if (isBlank(value)) messages.push('Ingresa una calificación.');
   else if (!Number.isFinite(grade)) messages.push('La calificación debe ser numérica.');
-  else if (grade < 0 || grade > max) messages.push(`La calificación debe estar entre 0 y ${max}.`);
+  else if (grade < 1 || grade > max) messages.push(`La calificación debe estar entre 1 y ${max}.`);
 
   return messages.length ? invalid('Revisa la calificación', messages) : ok();
 };
