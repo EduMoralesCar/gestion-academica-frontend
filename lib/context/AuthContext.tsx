@@ -35,40 +35,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<AuthResponse> => {
     try {
-      const appState = getAppState();
-      
-      // Find user by email (mock password check - in production use bcrypt)
-      const usuariosList = appState?.usuarios || [];
-      const foundUser = usuariosList.find(u => u.email === email);
-      
-      if (!foundUser) {
+      const params = new URLSearchParams();
+      params.append('username', email);
+      params.append('password', password);
+
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Usuario o contraseña incorrectos' }));
         return {
           user: null,
           token: null,
-          error: 'Usuario no encontrado',
+          error: errorData.detail || 'Usuario o contraseña incorrectos',
         };
       }
 
-      // Mock password validation (in production use bcrypt)
-      let validPassword = (foundUser as any).password;
-      
-      if (!validPassword) {
-        if (foundUser.rol === 'ADMIN') validPassword = 'admin123';
-        else if (foundUser.rol === 'DOCENTE') validPassword = 'docente123';
-        else validPassword = 'estudiante123';
-      }
+      const data = await response.json();
+      const token = data.access_token;
+      const foundUser = data.user;
 
-      if (password !== validPassword) {
-        return {
-          user: null,
-          token: null,
-          error: 'Contraseña incorrecta',
-        };
-      }
-
-      // Create mock JWT token
-      const token = btoa(JSON.stringify({ userId: foundUser.id, email, rol: foundUser.rol }));
-      
       setUser(foundUser);
       setIsAuthenticated(true);
       
@@ -85,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return {
         user: null,
         token: null,
-        error: 'Error al iniciar sesión',
+        error: 'Error de conexión con el servidor',
       };
     }
   };
