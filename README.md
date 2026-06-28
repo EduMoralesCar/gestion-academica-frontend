@@ -94,6 +94,11 @@ npm run dev
 4. **Abrir en tu navegador:**
 Navega a `http://localhost:3000` para ver la aplicación funcionando localmente.
 
+5. **Ejecutar auditoría:**
+```bash
+npx unlighthouse --site https://nuevaschool.onrender.com/
+```
+
 ---
 
 
