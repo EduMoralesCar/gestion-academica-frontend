@@ -341,7 +341,7 @@ export default function CursosPage() {
                 placeholder="Buscar estudiante por nombre o correo..."
                 value={studentSearch}
                 onChange={e => setStudentSearch(e.target.value)}
-                className="flex-1"
+                className="flex-1 min-w-[200px] w-full"
               />
               
               {/* Career Filter Dropdown */}
