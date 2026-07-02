@@ -467,7 +467,8 @@ export const useAppData = () => {
           creditos: Number(curso.creditos),
           ciclo: Number(curso.ciclo),
           modalidad: curso.modalidad,
-          zoom_link: curso.zoom_link || null
+          zoom_link: curso.zoom_link || null,
+          carreras: curso.carreras || null
         })
       });
       if (res.ok) {
@@ -507,7 +508,8 @@ export const useAppData = () => {
           creditos: Number(updatedCurso.creditos),
           ciclo: Number(updatedCurso.ciclo),
           modalidad: updatedCurso.modalidad,
-          zoom_link: updatedCurso.zoom_link || null
+          zoom_link: updatedCurso.zoom_link || null,
+          carreras: updatedCurso.carreras || null
         })
       });
 
