@@ -336,43 +336,47 @@ export default function CursosPage() {
             </div>
 
             {/* Filter controls */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 py-3">
-              <Input
-                placeholder="Buscar estudiante por nombre o correo..."
-                value={studentSearch}
-                onChange={e => setStudentSearch(e.target.value)}
-                className="flex-1 min-w-[200px] w-full"
-              />
-              
-              {/* Career Filter Dropdown */}
-              <select
-                value={selectedFilterCarrera}
-                onChange={e => setSelectedFilterCarrera(e.target.value)}
-                className="rounded-md border border-slate-200 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[220px]"
-              >
-                <option value="">Todas las carreras</option>
-                {(() => {
-                  const selectedCursoObj = (appState.cursos || []).find(c => c.id === selectedCursoId);
-                  const courseCareers = selectedCursoObj?.carreras ? selectedCursoObj.carreras.split(',') : [];
-                  const careersToShow = showAllCareers ? LISTA_CARRERAS : courseCareers;
-                  return careersToShow.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ));
-                })()}
-              </select>
-
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer whitespace-nowrap bg-slate-50 border border-slate-200 px-3 py-2 rounded-md">
-                <input
-                  type="checkbox"
-                  checked={showAllCareers}
-                  onChange={() => {
-                    setShowAllCareers(!showAllCareers);
-                    setSelectedFilterCarrera('');
-                  }}
-                  className="rounded border-slate-300 text-blue-900 focus:ring-blue-500 h-4 w-4"
+            {/* Filter controls */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 py-3 items-center">
+              <div className="md:col-span-6">
+                <Input
+                  placeholder="Buscar estudiante por nombre o correo..."
+                  value={studentSearch}
+                  onChange={e => setStudentSearch(e.target.value)}
+                  className="w-full"
                 />
-                Ver todas las carreras
-              </label>
+              </div>
+              <div className="md:col-span-3">
+                <select
+                  value={selectedFilterCarrera}
+                  onChange={e => setSelectedFilterCarrera(e.target.value)}
+                  className="w-full rounded-md border border-slate-200 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-10"
+                >
+                  <option value="">Todas las carreras</option>
+                  {(() => {
+                    const selectedCursoObj = (appState.cursos || []).find(c => c.id === selectedCursoId);
+                    const courseCareers = selectedCursoObj?.carreras ? selectedCursoObj.carreras.split(',') : [];
+                    const careersToShow = showAllCareers ? LISTA_CARRERAS : courseCareers;
+                    return careersToShow.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ));
+                  })()}
+                </select>
+              </div>
+              <div className="md:col-span-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer whitespace-nowrap bg-slate-50 border border-slate-200 px-3 py-2 rounded-md w-full justify-center h-10">
+                  <input
+                    type="checkbox"
+                    checked={showAllCareers}
+                    onChange={() => {
+                      setShowAllCareers(!showAllCareers);
+                      setSelectedFilterCarrera('');
+                    }}
+                    className="rounded border-slate-300 text-blue-900 focus:ring-blue-500 h-4 w-4"
+                  />
+                  Ver todas las carreras
+                </label>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto overflow-x-hidden mt-2 border rounded-md">
