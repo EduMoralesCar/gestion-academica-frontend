@@ -305,7 +305,7 @@ export default function CursosPage() {
         </div>
 
         <Dialog open={isMatriculaOpen} onOpenChange={setIsMatriculaOpen}>
-          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Gestión de Matrículas</DialogTitle>
               <DialogDescription>
@@ -388,7 +388,7 @@ export default function CursosPage() {
                             <div className="text-xs text-slate-500">{est.email}</div>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="inline-block text-[11px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-medium max-w-[200px] truncate" title={est.carrera}>
+                            <span className="inline-block text-[11px] bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full font-medium" title={est.carrera}>
                               {est.carrera || 'No asignada'}
                             </span>
                           </td>
