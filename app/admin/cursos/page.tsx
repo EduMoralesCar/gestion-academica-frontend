@@ -33,6 +33,7 @@ export default function CursosPage() {
   const [studentSearch, setStudentSearch] = useState('');
   const [showAllCareers, setShowAllCareers] = useState(false);
   const [selectedFilterCarrera, setSelectedFilterCarrera] = useState('');
+  const [enrollmentFilter, setEnrollmentFilter] = useState<'TODOS' | 'MATRICULADOS' | 'PENDIENTES'>('TODOS');
 
   const generateCourseCode = (nombre: string, ciclo: string) => {
     if (!nombre) return '';
@@ -169,6 +170,7 @@ export default function CursosPage() {
     setStudentSearch('');
     setSelectedFilterCarrera('');
     setShowAllCareers(false);
+    setEnrollmentFilter('TODOS');
     setIsMatriculaOpen(true);
   };
 
@@ -309,7 +311,7 @@ export default function CursosPage() {
         </div>
 
         <Dialog open={isMatriculaOpen} onOpenChange={setIsMatriculaOpen}>
-          <DialogContent className="max-w-4xl w-[95vw] md:w-[90vw] max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogContent className="max-w-6xl w-[95vw] md:w-[90vw] max-h-[90vh] flex flex-col overflow-hidden">
             <DialogHeader>
               <DialogTitle>Gestión de Matrículas</DialogTitle>
               <DialogDescription>
@@ -374,75 +376,127 @@ export default function CursosPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto overflow-x-hidden mt-2 border rounded-md">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-700 sticky top-0 border-b">
-                  <tr>
-                    <th className="px-4 py-3 w-2/5">Estudiante</th>
-                    <th className="px-4 py-3 w-2/5">Carrera</th>
-                    <th className="px-4 py-3 text-center w-1/5">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {(() => {
-                    const selectedCursoObj = (appState.cursos || []).find(c => c.id === selectedCursoId);
-                    const courseCareers = selectedCursoObj?.carreras ? selectedCursoObj.carreras.split(',') : [];
-                    
-                    const filtered = todosLosEstudiantes.filter(est => {
-                      const searchMatch = `${est.nombre} ${est.apellido} ${est.email}`.toLowerCase().includes(studentSearch.toLowerCase());
-                      
-                      let careerMatch = false;
-                      if (selectedFilterCarrera) {
-                        careerMatch = est.carrera === selectedFilterCarrera;
-                      } else {
-                        careerMatch = showAllCareers || courseCareers.length === 0 || (est.carrera && courseCareers.includes(est.carrera));
-                      }
-                      
-                      return searchMatch && careerMatch;
-                    });
+            {(() => {
+              const selectedCursoObj = (appState.cursos || []).find(c => c.id === selectedCursoId);
+              const courseCareers = selectedCursoObj?.carreras ? selectedCursoObj.carreras.split(',') : [];
+              
+              const baseFiltered = todosLosEstudiantes.filter(est => {
+                const searchMatch = `${est.nombre} ${est.apellido} ${est.email}`.toLowerCase().includes(studentSearch.toLowerCase());
+                let careerMatch = false;
+                if (selectedFilterCarrera) {
+                  careerMatch = est.carrera === selectedFilterCarrera;
+                } else {
+                  careerMatch = showAllCareers || courseCareers.length === 0 || (est.carrera && courseCareers.includes(est.carrera));
+                }
+                return searchMatch && careerMatch;
+              });
 
-                    if (filtered.length === 0) {
-                      return (
+              const counts = baseFiltered.reduce((acc, est) => {
+                const isEnrolled = (appState.matriculas || []).some(m => m.curso_id === selectedCursoId && m.estudiante_id === est.id && m.estado === 'activo');
+                if (isEnrolled) {
+                  acc.matriculados += 1;
+                } else {
+                  acc.pendientes += 1;
+                }
+                acc.todos += 1;
+                return acc;
+              }, { todos: 0, matriculados: 0, pendientes: 0 });
+
+              const finalFiltered = baseFiltered.filter(est => {
+                const isEnrolled = (appState.matriculas || []).some(m => m.curso_id === selectedCursoId && m.estudiante_id === est.id && m.estado === 'activo');
+                if (enrollmentFilter === 'MATRICULADOS') return isEnrolled;
+                if (enrollmentFilter === 'PENDIENTES') return !isEnrolled;
+                return true;
+              });
+
+              return (
+                <>
+                  {/* Status tabs */}
+                  <div className="flex gap-4 border-b border-slate-100 pb-2 mt-2">
+                    <button
+                      onClick={() => setEnrollmentFilter('TODOS')}
+                      className={`pb-2 text-sm font-semibold transition-all relative ${
+                        enrollmentFilter === 'TODOS'
+                          ? 'text-blue-900 border-b-2 border-blue-900'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Todos ({counts.todos})
+                    </button>
+                    <button
+                      onClick={() => setEnrollmentFilter('MATRICULADOS')}
+                      className={`pb-2 text-sm font-semibold transition-all relative ${
+                        enrollmentFilter === 'MATRICULADOS'
+                          ? 'text-blue-900 border-b-2 border-blue-900'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Matriculados ({counts.matriculados})
+                    </button>
+                    <button
+                      onClick={() => setEnrollmentFilter('PENDIENTES')}
+                      className={`pb-2 text-sm font-semibold transition-all relative ${
+                        enrollmentFilter === 'PENDIENTES'
+                          ? 'text-blue-900 border-b-2 border-blue-900'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Por Matricular ({counts.pendientes})
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 border rounded-md">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-50 text-slate-700 sticky top-0 border-b">
                         <tr>
-                          <td colSpan={3} className="px-4 py-8 text-center text-slate-400">
-                            Ningún estudiante coincide con los filtros
-                          </td>
+                          <th className="px-6 py-3 w-2/5">Estudiante</th>
+                          <th className="px-6 py-3 w-2/5">Carrera</th>
+                          <th className="px-6 py-3 text-center w-1/5">Acción</th>
                         </tr>
-                      );
-                    }
+                      </thead>
+                      <tbody className="divide-y">
+                        {finalFiltered.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="px-6 py-8 text-center text-slate-400">
+                              Ningún estudiante coincide con los filtros
+                            </td>
+                          </tr>
+                        ) : (
+                          finalFiltered.map(est => {
+                            const matricula = (appState.matriculas || []).find(m => m.curso_id === selectedCursoId && m.estudiante_id === est.id && m.estado === 'activo');
+                            const isEnrolled = !!matricula;
 
-                    return filtered.map(est => {
-                      const matricula = (appState.matriculas || []).find(m => m.curso_id === selectedCursoId && m.estudiante_id === est.id && m.estado === 'activo');
-                      const isEnrolled = !!matricula;
-
-                      return (
-                        <tr key={est.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 align-middle">
-                            <div className="font-medium text-slate-900">{est.nombre} {est.apellido}</div>
-                            <div className="text-xs text-slate-500 font-mono">{est.email}</div>
-                          </td>
-                          <td className="px-4 py-3 align-middle">
-                            <span className="inline-block text-[11px] bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full font-medium whitespace-normal break-words max-w-[280px]" title={est.carrera}>
-                              {est.carrera || 'No asignada'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center align-middle">
-                             <Button 
-                               variant={isEnrolled ? 'default' : 'outline'}
-                               size="sm"
-                               className={isEnrolled ? 'bg-green-600 hover:bg-green-700 text-white font-medium border-0 w-32' : 'text-slate-600 font-medium w-32'}
-                               onClick={() => handleToggleMatricula(est.id, isEnrolled, matricula?.id)}
-                             >
-                               {isEnrolled ? 'Matriculado' : 'Añadir al curso'}
-                             </Button>
-                          </td>
-                        </tr>
-                      );
-                    });
-                  })()}
-                </tbody>
-              </table>
-            </div>
+                            return (
+                              <tr key={est.id} className="hover:bg-slate-50">
+                                <td className="px-6 py-3.5 align-middle">
+                                  <div className="font-semibold text-slate-900">{est.nombre} {est.apellido}</div>
+                                  <div className="text-xs text-slate-500 font-mono mt-0.5">{est.email}</div>
+                                </td>
+                                <td className="px-6 py-3.5 align-middle">
+                                  <span className="inline-block text-[11px] bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full font-medium whitespace-normal break-words max-w-[320px]" title={est.carrera}>
+                                    {est.carrera || 'No asignada'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-3.5 text-center align-middle">
+                                   <Button 
+                                     variant={isEnrolled ? 'default' : 'outline'}
+                                     size="sm"
+                                     className={isEnrolled ? 'bg-green-600 hover:bg-green-700 text-white font-medium border-0 w-32' : 'text-slate-600 font-medium w-32'}
+                                     onClick={() => handleToggleMatricula(est.id, isEnrolled, matricula?.id)}
+                                   >
+                                     {isEnrolled ? 'Matriculado' : 'Añadir al curso'}
+                                   </Button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
             <div className="pt-4 flex justify-end">
               <Button onClick={() => setIsMatriculaOpen(false)} className="bg-slate-900 text-white hover:bg-slate-800">Cerrar Panel</Button>
             </div>
