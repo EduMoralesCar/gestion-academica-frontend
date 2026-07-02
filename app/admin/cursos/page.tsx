@@ -19,6 +19,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BookOpen, Users, Plus, Edit2, Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { LISTA_CARRERAS } from '@/lib/constants';
 
 export default function CursosPage() {
   const { appState, addCurso, updateCurso, deleteCurso, addMatricula, removeMatricula } = useAppData();
@@ -28,6 +29,43 @@ export default function CursosPage() {
   
   const [editingCursoId, setEditingCursoId] = useState<string | null>(null);
   const [selectedCursoId, setSelectedCursoId] = useState<string | null>(null);
+  const [selectedCarreras, setSelectedCarreras] = useState<string[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [showAllCareers, setShowAllCareers] = useState(false);
+
+  const generateCourseCode = (nombre: string, ciclo: string) => {
+    if (!nombre) return '';
+    const cleanName = nombre
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9\s]/g, '')
+      .trim();
+    
+    let initials = '';
+    const words = cleanName.split(/\s+/).filter(w => w.length > 2);
+    if (words.length >= 2) {
+      initials = (words[0].slice(0, 1) + words[1].slice(0, 2)).toUpperCase();
+    } else if (cleanName.length > 0) {
+      initials = cleanName.slice(0, 3).toUpperCase().padEnd(3, 'X');
+    } else {
+      initials = 'CUR';
+    }
+
+    const prefix = `${initials}-${ciclo}`;
+    
+    const existingCodes = (appState.cursos || [])
+      .filter(c => c.codigo && c.codigo.startsWith(prefix))
+      .map(c => {
+        const numPart = c.codigo.slice(prefix.length);
+        const parsed = parseInt(numPart, 10);
+        return isNaN(parsed) ? 0 : parsed;
+      });
+
+    const maxNumber = existingCodes.length > 0 ? Math.max(...existingCodes) : 0;
+    const nextNumber = maxNumber === 0 ? 1 : maxNumber + 1;
+    const paddedNumber = String(nextNumber).padStart(2, '0');
+    return `${prefix}${paddedNumber}`;
+  };
 
   const [cursoData, setCursoData] = useState({
     nombre: '',
@@ -53,25 +91,23 @@ export default function CursosPage() {
       return;
     }
 
+    const payload: any = {
+      nombre: cursoData.nombre,
+      codigo: cursoData.codigo,
+      docente_id: cursoData.docente_id,
+      creditos: parseInt(cursoData.creditos),
+      ciclo: parseInt(cursoData.ciclo),
+      modalidad: cursoData.modalidad as 'presencial' | 'virtual',
+      carreras: selectedCarreras.join(',')
+    };
+
     if (editingCursoId) {
-      updateCurso(editingCursoId, {
-        nombre: cursoData.nombre,
-        codigo: cursoData.codigo,
-        docente_id: cursoData.docente_id,
-        creditos: parseInt(cursoData.creditos),
-        ciclo: parseInt(cursoData.ciclo),
-        modalidad: cursoData.modalidad as 'presencial' | 'virtual'
-      });
+      updateCurso(editingCursoId, payload);
       toast.success('Curso actualizado con éxito');
     } else {
       addCurso({
         id: `curso-${Date.now()}`,
-        nombre: cursoData.nombre.trim(),
-        codigo: cursoData.codigo.trim().toUpperCase(),
-        docente_id: cursoData.docente_id,
-        creditos: parseInt(cursoData.creditos),
-        ciclo: parseInt(cursoData.ciclo),
-        modalidad: cursoData.modalidad as 'presencial' | 'virtual',
+        ...payload,
         estado: 'activo',
         createdAt: new Date().toISOString()
       });
@@ -84,6 +120,7 @@ export default function CursosPage() {
 
   const resetCursoForm = () => {
     setCursoData({ nombre: '', codigo: '', docente_id: '', creditos: '3', ciclo: '1', modalidad: '' });
+    setSelectedCarreras([]);
     setEditingCursoId(null);
   };
 
@@ -96,6 +133,7 @@ export default function CursosPage() {
       ciclo: curso.ciclo?.toString() || '1',
       modalidad: curso.modalidad || 'presencial'
     });
+    setSelectedCarreras(curso.carreras ? curso.carreras.split(',') : []);
     setEditingCursoId(curso.id);
     setIsCursoOpen(true);
   };
@@ -158,98 +196,221 @@ export default function CursosPage() {
                 <DialogTitle>{editingCursoId ? 'Editar Curso' : 'Crear Curso'}</DialogTitle>
                 <DialogDescription>Define los parámetros del curso y asígnale un Docente titular.</DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleCursoSubmit} className="space-y-4 pt-4">
-                 <div>
-                   <label className="text-sm font-medium">Nombre del Curso</label>
-                   <Input required value={cursoData.nombre} onChange={e => setCursoData({...cursoData, nombre: e.target.value})} placeholder="Ej. Matemática Avanzada" />
-                 </div>
-                 <div className="grid grid-cols-2 gap-4">
-                   <div>
-                     <label className="text-sm font-medium">Código</label>
-                     <Input required value={cursoData.codigo} onChange={e => setCursoData({...cursoData, codigo: e.target.value})} placeholder="Ej. MAT-301" />
-                   </div>
-                   <div>
-                     <label className="text-sm font-medium">Docente Titular</label>
-                     <Select value={cursoData.docente_id} onValueChange={val => setCursoData({...cursoData, docente_id: val})}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar docente" /></SelectTrigger>
-                        <SelectContent>
-                          {docentes.map(d => (
-                            <SelectItem key={d.id} value={d.id}>{d.nombre} {d.apellido}</SelectItem>
-                          ))}
-                        </SelectContent>
-                     </Select>
-                   </div>
-                   <div>
-                     <label className="text-sm font-medium">Créditos</label>
-                     <Input required type="number" min="1" max="10" value={cursoData.creditos} onChange={e => setCursoData({...cursoData, creditos: e.target.value})} />
-                   </div>
-                   <div>
-                     <label className="text-sm font-medium">Ciclo</label>
-                     <Input required type="number" min="1" max="10" value={cursoData.ciclo} onChange={e => setCursoData({...cursoData, ciclo: e.target.value})} />
-                   </div>
-                   <div className="col-span-2">
-                     <label className="text-sm font-medium">Modalidad</label>
-                     <Select value={cursoData.modalidad} onValueChange={val => setCursoData({...cursoData, modalidad: val})}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar modalidad" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="presencial">Presencial</SelectItem>
-                          <SelectItem value="virtual">Virtual</SelectItem>
-                        </SelectContent>
-                     </Select>
-                   </div>
-                 </div>
-                 <div className="flex justify-end pt-4">
-                   <Button type="submit" className="bg-blue-900">{editingCursoId ? 'Guardar Cambios' : 'Crear Curso'}</Button>
-                 </div>
-              </form>
+              <form onSubmit={handleCursoSubmit} className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Nombre del Curso</label>
+                    <Input 
+                      required 
+                      value={cursoData.nombre} 
+                      onChange={e => {
+                        const newName = e.target.value;
+                        setCursoData(prev => {
+                          const updated = { ...prev, nombre: newName };
+                          if (!editingCursoId) {
+                            updated.codigo = generateCourseCode(newName, prev.ciclo);
+                          }
+                          return updated;
+                        });
+                      }} 
+                      placeholder="Ej. Matemática Avanzada" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Código</label>
+                      <Input 
+                        required 
+                        value={cursoData.codigo} 
+                        onChange={e => setCursoData({...cursoData, codigo: e.target.value})} 
+                        placeholder="Ej. MAT-301" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Docente Titular</label>
+                      <Select value={cursoData.docente_id} onValueChange={val => setCursoData({...cursoData, docente_id: val})}>
+                         <SelectTrigger><SelectValue placeholder="Seleccionar docente" /></SelectTrigger>
+                         <SelectContent>
+                           {docentes.map(d => (
+                             <SelectItem key={d.id} value={d.id}>{d.nombre} {d.apellido}</SelectItem>
+                           ))}
+                         </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Créditos</label>
+                      <Input required type="number" min="1" max="10" value={cursoData.creditos} onChange={e => setCursoData({...cursoData, creditos: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Ciclo</label>
+                      <Input 
+                        required 
+                        type="number" 
+                        min="1" 
+                        max="10" 
+                        value={cursoData.ciclo} 
+                        onChange={e => {
+                          const newCiclo = e.target.value;
+                          setCursoData(prev => {
+                            const updated = { ...prev, ciclo: newCiclo };
+                            if (!editingCursoId) {
+                              updated.codigo = generateCourseCode(prev.nombre, newCiclo);
+                            }
+                            return updated;
+                          });
+                        }} 
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium">Modalidad</label>
+                      <Select value={cursoData.modalidad} onValueChange={val => setCursoData({...cursoData, modalidad: val})}>
+                         <SelectTrigger><SelectValue placeholder="Seleccionar modalidad" /></SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="presencial">Presencial</SelectItem>
+                           <SelectItem value="virtual">Virtual</SelectItem>
+                         </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium">Carreras que llevan este curso (Matrícula)</label>
+                      <div className="mt-1 border border-slate-200 rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                        {LISTA_CARRERAS.map(c => {
+                          const isChecked = selectedCarreras.includes(c);
+                          return (
+                            <label key={c} className="flex items-center gap-2 text-sm font-normal text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isChecked) {
+                                    setSelectedCarreras(selectedCarreras.filter(x => x !== c));
+                                  } else {
+                                    setSelectedCarreras([...selectedCarreras, c]);
+                                  }
+                                }}
+                                className="rounded border-slate-300 text-blue-900 focus:ring-blue-500"
+                              />
+                              {c}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-4">
+                    <Button type="submit" className="bg-blue-900">{editingCursoId ? 'Guardar Cambios' : 'Crear Curso'}</Button>
+                  </div>
+               </form>
             </DialogContent>
           </Dialog>
         </div>
 
         <Dialog open={isMatriculaOpen} onOpenChange={setIsMatriculaOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Gestión de Matrículas</DialogTitle>
               <DialogDescription>
-                Habilita o deshabilita a los estudiantes para el curso actual.
+                Habilita o deshabilita a los estudiantes para el curso seleccionado.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-y-auto mt-4 border rounded-md">
+            
+            {/* Curso Selector */}
+            <div className="flex flex-col gap-1.5 pb-4 border-b">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Curso Activo</label>
+              <select
+                value={selectedCursoId || ''}
+                onChange={e => setSelectedCursoId(e.target.value)}
+                className="w-full rounded-md border border-slate-200 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Seleccionar curso...</option>
+                {(appState.cursos || []).map(c => (
+                  <option key={c.id} value={c.id}>{c.nombre} ({c.codigo}) - Ciclo {c.ciclo}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Filter controls */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 py-3">
+              <Input
+                placeholder="Buscar estudiante por nombre o correo..."
+                value={studentSearch}
+                onChange={e => setStudentSearch(e.target.value)}
+                className="flex-1"
+              />
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer whitespace-nowrap bg-slate-50 border border-slate-200 px-3 py-2 rounded-md">
+                <input
+                  type="checkbox"
+                  checked={showAllCareers}
+                  onChange={() => setShowAllCareers(!showAllCareers)}
+                  className="rounded border-slate-300 text-blue-900 focus:ring-blue-500 h-4 w-4"
+                />
+                Ver todas las carreras
+              </label>
+            </div>
+
+            <div className="flex-1 overflow-y-auto mt-2 border rounded-md">
               <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50 text-gray-700 sticky top-0">
+                <thead className="bg-slate-50 text-slate-700 sticky top-0 border-b">
                   <tr>
                     <th className="px-4 py-3">Estudiante</th>
-                    <th className="px-4 py-3">Email</th>
-                    <th className="px-4 py-3 text-center">Matriculado</th>
+                    <th className="px-4 py-3">Carrera</th>
+                    <th className="px-4 py-3 text-center">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {todosLosEstudiantes.map(est => {
-                    const matricula = (appState.matriculas || []).find(m => m.curso_id === selectedCursoId && m.estudiante_id === est.id && m.estado === 'activo');
-                    const isEnrolled = !!matricula;
+                  {(() => {
+                    const selectedCursoObj = (appState.cursos || []).find(c => c.id === selectedCursoId);
+                    const courseCareers = selectedCursoObj?.carreras ? selectedCursoObj.carreras.split(',') : [];
+                    
+                    const filtered = todosLosEstudiantes.filter(est => {
+                      const searchMatch = `${est.nombre} ${est.apellido} ${est.email}`.toLowerCase().includes(studentSearch.toLowerCase());
+                      const careerMatch = showAllCareers || courseCareers.length === 0 || (est.carrera && courseCareers.includes(est.carrera));
+                      return searchMatch && careerMatch;
+                    });
 
-                    return (
-                      <tr key={est.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium">{est.nombre} {est.apellido}</td>
-                        <td className="px-4 py-3 text-gray-500">{est.email}</td>
-                        <td className="px-4 py-3 text-center">
-                           <Button 
-                             variant={isEnrolled ? 'default' : 'outline'}
-                             size="sm"
-                             className={isEnrolled ? 'bg-green-600 hover:bg-green-700' : ''}
-                             onClick={() => handleToggleMatricula(est.id, isEnrolled, matricula?.id)}
-                           >
-                             {isEnrolled ? 'Matriculado' : 'Añadir al curso'}
-                           </Button>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-8 text-center text-slate-400">
+                            Ningún estudiante coincide con los filtros
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map(est => {
+                      const matricula = (appState.matriculas || []).find(m => m.curso_id === selectedCursoId && m.estudiante_id === est.id && m.estado === 'activo');
+                      const isEnrolled = !!matricula;
+
+                      return (
+                        <tr key={est.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-slate-900">{est.nombre} {est.apellido}</div>
+                            <div className="text-xs text-slate-500">{est.email}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-block text-[11px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-medium max-w-[200px] truncate" title={est.carrera}>
+                              {est.carrera || 'No asignada'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                             <Button 
+                               variant={isEnrolled ? 'default' : 'outline'}
+                               size="sm"
+                               className={isEnrolled ? 'bg-green-600 hover:bg-green-700 text-white font-medium border-0' : 'text-slate-600 font-medium'}
+                               onClick={() => handleToggleMatricula(est.id, isEnrolled, matricula?.id)}
+                             >
+                               {isEnrolled ? 'Matriculado' : 'Añadir al curso'}
+                             </Button>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
             <div className="pt-4 flex justify-end">
-              <Button onClick={() => setIsMatriculaOpen(false)}>Cerrar Panel</Button>
+              <Button onClick={() => setIsMatriculaOpen(false)} className="bg-slate-900 text-white hover:bg-slate-800">Cerrar Panel</Button>
             </div>
           </DialogContent>
         </Dialog>

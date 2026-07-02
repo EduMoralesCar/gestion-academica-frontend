@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { UserRole } from '@/lib/types';
 import { validateUserForm } from '@/lib/validation';
 import { useValidationModal } from '@/components/ui/validation-modal';
+import { DEPARTAMENTOS_CARRERAS, DEPARTAMENTOS_DOCENTES, ESPECIALIDADES_DOCENTES } from '@/lib/constants';
 
 export default function GestionUsuariosPage() {
   const { user } = useAuth();
@@ -57,6 +58,22 @@ export default function GestionUsuariosPage() {
     // Admin specific
     nivel_acceso: ''
   });
+
+  const generateStudentCode = () => {
+    const yearSuffix = String(new Date().getFullYear()).slice(-2);
+    const prefix = `U${yearSuffix}`;
+    const studentCodes = (appState.usuarios || [])
+      .filter(u => u.rol === 'ESTUDIANTE' && u.codigo && u.codigo.startsWith(prefix))
+      .map(u => {
+        const numPart = u.codigo.slice(prefix.length);
+        const parsed = parseInt(numPart, 10);
+        return isNaN(parsed) ? 0 : parsed;
+      });
+    const maxNumber = studentCodes.length > 0 ? Math.max(...studentCodes) : 0;
+    const nextNumber = maxNumber + 1;
+    const paddedNumber = String(nextNumber).padStart(3, '0');
+    return `${prefix}${paddedNumber}`;
+  };
 
   const generateEmailFromName = (nombre: string, apellido: string, rol: string) => {
     if (!nombre.trim() && !apellido.trim()) return '';
@@ -243,7 +260,9 @@ export default function GestionUsuariosPage() {
               <Dialog open={isOpen} onOpenChange={(open) => {
                 setIsOpen(open);
                 if(!open) resetForm();
-                else setFormData({...formData, rol: activeRole});
+                else {
+                  setFormData({...formData, rol: activeRole, codigo: ''});
+                }
               }}>
                 <DialogTrigger asChild>
                   <Button className="bg-blue-900">
@@ -273,6 +292,9 @@ export default function GestionUsuariosPage() {
                               if (!editingId && !emailManuallyEdited) {
                                 nextFormData.email = generateEmailFromName(nameVal, prev.apellido, prev.rol);
                               }
+                              if (!editingId && prev.rol === 'ESTUDIANTE' && nameVal.trim() && prev.apellido.trim() && !prev.codigo) {
+                                nextFormData.codigo = generateStudentCode();
+                              }
                               return nextFormData;
                             });
                           }} 
@@ -290,6 +312,9 @@ export default function GestionUsuariosPage() {
                               const nextFormData = { ...prev, apellido: surnameVal };
                               if (!editingId && !emailManuallyEdited) {
                                 nextFormData.email = generateEmailFromName(prev.nombre, surnameVal, prev.rol);
+                              }
+                              if (!editingId && prev.rol === 'ESTUDIANTE' && prev.nombre.trim() && surnameVal.trim() && !prev.codigo) {
+                                nextFormData.codigo = generateStudentCode();
                               }
                               return nextFormData;
                             });
@@ -333,7 +358,7 @@ export default function GestionUsuariosPage() {
                       <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                         <div className="col-span-2 md:col-span-1">
                           <label className="text-sm font-medium">Código Universitario</label>
-                          <Input required value={formData.codigo} onChange={e => setFormData({...formData, codigo: e.target.value})} className="mt-1" />
+                          <Input required readOnly value={formData.codigo} className="mt-1 bg-slate-50 cursor-not-allowed font-mono" />
                         </div>
                         <div className="col-span-2 md:col-span-1">
                           <label className="text-sm font-medium">Ciclo Actual</label>
@@ -341,7 +366,21 @@ export default function GestionUsuariosPage() {
                         </div>
                         <div className="col-span-2">
                           <label className="text-sm font-medium">Carrera</label>
-                          <Input required value={formData.carrera} onChange={e => setFormData({...formData, carrera: e.target.value})} className="mt-1" />
+                          <select 
+                            required 
+                            value={formData.carrera} 
+                            onChange={e => setFormData({...formData, carrera: e.target.value})} 
+                            className="flex h-10 w-full rounded-md border border-slate-200 bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1"
+                          >
+                            <option value="">Seleccionar carrera...</option>
+                            {Object.entries(DEPARTAMENTOS_CARRERAS).map(([depto, carreras]) => (
+                              <optgroup key={depto} label={depto}>
+                                {carreras.map(c => (
+                                  <option key={c} value={c}>{c}</option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
                         </div>
                       </div>
                     )}
@@ -350,11 +389,31 @@ export default function GestionUsuariosPage() {
                       <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                         <div className="col-span-2">
                           <label className="text-sm font-medium">Departamento Académico</label>
-                          <Input required value={formData.departamento} onChange={e => setFormData({...formData, departamento: e.target.value})} className="mt-1" />
+                          <select 
+                            required 
+                            value={formData.departamento} 
+                            onChange={e => setFormData({...formData, departamento: e.target.value})} 
+                            className="flex h-10 w-full rounded-md border border-slate-200 bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 mt-1"
+                          >
+                            <option value="">Seleccionar departamento...</option>
+                            {DEPARTAMENTOS_DOCENTES.map(d => (
+                              <option key={d} value={d}>{d}</option>
+                            ))}
+                          </select>
                         </div>
                         <div className="col-span-2">
                           <label className="text-sm font-medium">Especialidad</label>
-                          <Input required value={formData.especialidad} onChange={e => setFormData({...formData, especialidad: e.target.value})} className="mt-1" />
+                          <select 
+                            required 
+                            value={formData.especialidad} 
+                            onChange={e => setFormData({...formData, especialidad: e.target.value})} 
+                            className="flex h-10 w-full rounded-md border border-slate-200 bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 mt-1"
+                          >
+                            <option value="">Seleccionar especialidad...</option>
+                            {ESPECIALIDADES_DOCENTES.map(esp => (
+                              <option key={esp} value={esp}>{esp}</option>
+                            ))}
+                          </select>
                         </div>
                       </div>
                     )}
