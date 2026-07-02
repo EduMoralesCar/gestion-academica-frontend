@@ -195,7 +195,7 @@ export default function CursosPage() {
                 Crear Nuevo Curso
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingCursoId ? 'Editar Curso' : 'Crear Curso'}</DialogTitle>
                 <DialogDescription>Define los parámetros del curso y asígnale un Docente titular.</DialogDescription>
@@ -309,7 +309,7 @@ export default function CursosPage() {
         </div>
 
         <Dialog open={isMatriculaOpen} onOpenChange={setIsMatriculaOpen}>
-          <DialogContent className="max-w-4xl w-[90vw] h-[80vh] max-h-[90vh] flex flex-col">
+          <DialogContent className="max-w-4xl w-[95vw] md:w-[90vw] max-h-[90vh] flex flex-col overflow-hidden">
             <DialogHeader>
               <DialogTitle>Gestión de Matrículas</DialogTitle>
               <DialogDescription>
@@ -336,21 +336,18 @@ export default function CursosPage() {
             </div>
 
             {/* Filter controls */}
-            {/* Filter controls */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 py-3 items-center">
-              <div className="md:col-span-6">
-                <Input
-                  placeholder="Buscar estudiante por nombre o correo..."
-                  value={studentSearch}
-                  onChange={e => setStudentSearch(e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              <div className="md:col-span-3">
+            <div className="space-y-3 py-3 border-b">
+              <Input
+                placeholder="Buscar estudiante por nombre o correo..."
+                value={studentSearch}
+                onChange={e => setStudentSearch(e.target.value)}
+                className="w-full"
+              />
+              <div className="flex flex-col sm:flex-row gap-3">
                 <select
                   value={selectedFilterCarrera}
                   onChange={e => setSelectedFilterCarrera(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-10"
+                  className="flex-1 rounded-md border border-slate-200 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-10 min-w-0"
                 >
                   <option value="">Todas las carreras</option>
                   {(() => {
@@ -362,9 +359,7 @@ export default function CursosPage() {
                     ));
                   })()}
                 </select>
-              </div>
-              <div className="md:col-span-3">
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer whitespace-nowrap bg-slate-50 border border-slate-200 px-3 py-2 rounded-md w-full justify-center h-10">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer whitespace-nowrap bg-slate-50 border border-slate-200 px-4 py-2 rounded-md justify-center h-10 sm:w-auto w-full">
                   <input
                     type="checkbox"
                     checked={showAllCareers}

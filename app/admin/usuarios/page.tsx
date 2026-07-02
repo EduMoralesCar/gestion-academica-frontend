@@ -253,7 +253,7 @@ export default function GestionUsuariosPage() {
                     Añadir {activeRole === 'ESTUDIANTE' ? 'Estudiante' : activeRole === 'DOCENTE' ? 'Docente' : 'Administrador'}
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-xl">
+                <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>{editingId ? 'Editar Usuario' : 'Nuevo Usuario'}</DialogTitle>
                     <DialogDescription>
