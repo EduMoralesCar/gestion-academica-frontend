@@ -342,11 +342,9 @@ export default function MiPerfilPage() {
                         : '❌ Rostro no registrado. Sube una foto de perfil clara.'}
                     </p>
                   </div>
-                  {!faceApiLoaded && (
-                    <span className="text-[10px] text-slate-400">
-                      {loadingModels ? 'Cargando modelos IA...' : 'Modelos listos'}
-                    </span>
-                  )}
+                  <span className={`text-[10px] font-medium ${faceApiLoaded ? 'text-green-600' : 'text-slate-400'}`}>
+                    {faceApiLoaded ? '● Modelos listos' : loadingModels ? '⏳ Cargando modelos IA...' : '● Iniciando...'}
+                  </span>
                 </div>
               </div>
             </div>
