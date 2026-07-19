@@ -1,7 +1,8 @@
 import Image from 'next/image';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, GraduationCap, Loader2, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, GraduationCap, Loader2, Lock, Mail, ShieldCheck, Camera } from 'lucide-react';
+import Script from 'next/script';
 
 import { useAuth } from '@/lib/context/AuthContext';
 import { useAppData } from '@/lib/hooks/useAppData';
@@ -35,6 +36,151 @@ export const LoginForm: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoadingReset, setIsLoadingReset] = useState(false);
+
+  const [isFaceModalOpen, setIsFaceModalOpen] = useState(false);
+  const [faceApiLoaded, setFaceApiLoaded] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [faceLoginStatus, setFaceLoginStatus] = useState<'LOADING' | 'READY' | 'RECOGNIZING' | 'ERROR'>('LOADING');
+  const [faceErrorMsg, setFaceErrorMsg] = useState('');
+  const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null);
+
+  const initFaceApi = async () => {
+    if (typeof window !== 'undefined' && (window as any).faceapi && !faceApiLoaded && !loadingModels) {
+      setLoadingModels(true);
+      try {
+        const faceapi = (window as any).faceapi;
+        await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
+        await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+        await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+        setFaceApiLoaded(true);
+        setFaceLoginStatus('READY');
+        console.log('Modelos de face-api cargados con éxito en Login');
+      } catch (err) {
+        console.error('Error al cargar modelos face-api en Login:', err);
+        setFaceLoginStatus('ERROR');
+        setFaceErrorMsg('No se pudieron cargar los modelos de reconocimiento facial.');
+      } finally {
+        setLoadingModels(false);
+      }
+    }
+  };
+
+  const openFaceLogin = async () => {
+    if (!email.trim()) {
+      toast.error('Por favor, ingresa tu correo institucional primero para buscar tu rostro.');
+      return;
+    }
+    setIsFaceModalOpen(true);
+    setFaceErrorMsg('');
+    setFaceLoginStatus('LOADING');
+    
+    // Iniciar cámara y detección
+    setTimeout(() => {
+      startWebcam();
+    }, 150);
+  };
+
+  const closeFaceLogin = () => {
+    setIsFaceModalOpen(false);
+    stopWebcam();
+  };
+
+  const stopWebcam = () => {
+    if (webcamStream) {
+      webcamStream.getTracks().forEach(track => track.stop());
+      setWebcamStream(null);
+    }
+  };
+
+  const startWebcam = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      setWebcamStream(stream);
+      
+      const video = document.getElementById('face-webcam') as HTMLVideoElement;
+      if (video) {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          video.play();
+          startFaceDetection(video, stream);
+        };
+      }
+    } catch (err) {
+      console.error('Error al acceder a la cámara:', err);
+      setFaceLoginStatus('ERROR');
+      setFaceErrorMsg('No se pudo acceder a la cámara web. Verifica los permisos de tu navegador.');
+    }
+  };
+
+  const startFaceDetection = async (video: HTMLVideoElement, stream: MediaStream) => {
+    const faceapi = (window as any).faceapi;
+    if (!faceapi) return;
+
+    setFaceLoginStatus('RECOGNIZING');
+    
+    let isChecking = false;
+    let scanCount = 0;
+    
+    const intervalId = setInterval(async () => {
+      if (!stream.active || !video.srcObject) {
+        clearInterval(intervalId);
+        return;
+      }
+      
+      if (isChecking) return;
+      isChecking = true;
+      scanCount++;
+
+      try {
+        const detection = await faceapi.detectSingleFace(video)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (detection) {
+          const embedding = Array.from(detection.descriptor);
+          
+          const res = await fetch('/api/auth/login-facial', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim(), embedding })
+          });
+
+          if (res.ok) {
+            clearInterval(intervalId);
+            const data = await res.json();
+            
+            localStorage.setItem('nuevaschool_token', data.access_token);
+            if (data.user) {
+              localStorage.setItem('nuevaschool_user', JSON.stringify(data.user));
+            }
+            
+            toast.success('Rostro reconocido con éxito. Ingresando...');
+            stopWebcam();
+            setIsFaceModalOpen(false);
+            
+            setTimeout(() => {
+              window.location.href = '/dashboard';
+            }, 500);
+            return;
+          } else {
+            const errDetail = await res.json().catch(() => ({}));
+            console.log('Intento de reconocimiento fallido:', errDetail.detail);
+          }
+        }
+      } catch (err) {
+        console.error('Error en intervalo de detección:', err);
+      } finally {
+        isChecking = false;
+        
+        if (scanCount > 80) { // ~24 segundos
+          clearInterval(intervalId);
+          setFaceLoginStatus('ERROR');
+          setFaceErrorMsg('Tiempo de espera agotado. Asegúrate de tener buena iluminación frente a la cámara.');
+          stopWebcam();
+        }
+      }
+    }, 300);
+  };
 
   const resetRecovery = () => {
     setResetStep(1);
@@ -242,6 +388,17 @@ export const LoginForm: React.FC = () => {
                   'Iniciar sesión'
                 )}
               </Button>
+
+              <Button
+                type="button"
+                onClick={openFaceLogin}
+                variant="outline"
+                className="h-12 w-full border-blue-200 text-blue-700 font-semibold hover:bg-blue-50/50 flex items-center justify-center gap-2 mt-2"
+                disabled={isLoading}
+              >
+                <Camera className="h-5 w-5" />
+                Ingresar con Reconocimiento Facial
+              </Button>
             </form>
           </div>
         </section>
@@ -345,6 +502,73 @@ export const LoginForm: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isFaceModalOpen} onOpenChange={(open) => { if (!open) closeFaceLogin(); }}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Inicio de Sesión Facial</DialogTitle>
+            <DialogDescription>
+              Colócate frente a la cámara web para validar tu identidad.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center justify-center space-y-4 pt-4">
+            <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-slate-950 border border-slate-800">
+              <video 
+                id="face-webcam" 
+                autoPlay 
+                muted 
+                playsInline 
+                className="w-full h-full object-cover scale-x-[-1]" 
+              />
+              
+              {/* Overlay states */}
+              {(faceLoginStatus === 'LOADING' || loadingModels) && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 text-white p-4 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+                  <p className="text-sm font-semibold">Cargando cámara y modelos IA...</p>
+                  <p className="text-xs text-slate-400 mt-1">Este proceso puede tardar unos segundos la primera vez.</p>
+                </div>
+              )}
+              
+              {faceLoginStatus === 'RECOGNIZING' && (
+                <div className="absolute inset-x-0 top-3 flex justify-center">
+                  <span className="bg-blue-600/90 text-white text-[10px] uppercase font-bold tracking-wider px-3 py-1 rounded-full animate-pulse">
+                    Escaneando Rostro...
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {faceLoginStatus === 'ERROR' && (
+              <div className="w-full bg-red-50 border border-red-200 rounded-md p-3 text-red-700 text-sm text-center">
+                <p className="font-semibold">Ocurrió un inconveniente:</p>
+                <p className="text-xs mt-1">{faceErrorMsg}</p>
+                <Button 
+                  onClick={startWebcam} 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2 border-red-300 text-red-700 hover:bg-red-100"
+                >
+                  Reintentar Cámara
+                </Button>
+              </div>
+            )}
+
+            <div className="w-full flex justify-end pt-2">
+              <Button onClick={closeFaceLogin} variant="outline" className="border-slate-200">
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Script 
+        src="/js/face-api.min.js" 
+        strategy="lazyOnload" 
+        onLoad={initFaceApi}
+      />
 
       {validationModal}
     </main>

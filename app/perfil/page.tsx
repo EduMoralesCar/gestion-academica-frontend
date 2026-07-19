@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useAppData } from '@/lib/hooks/useAppData';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -12,6 +12,7 @@ import { validatePasswordChange } from '@/lib/validation';
 import { useValidationModal } from '@/components/ui/validation-modal';
 import { Camera } from 'lucide-react';
 import Image from 'next/image';
+import Script from 'next/script';
 
 export default function MiPerfilPage() {
   const { user, updateUser } = useAuth();
@@ -24,15 +25,82 @@ export default function MiPerfilPage() {
 
   const userId = user?.id;
 
+  const [faceApiLoaded, setFaceApiLoaded] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
+
+  const initFaceApi = async () => {
+    if (typeof window !== 'undefined' && (window as any).faceapi && !loadingModels && !faceApiLoaded) {
+      setLoadingModels(true);
+      try {
+        const faceapi = (window as any).faceapi;
+        await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
+        await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+        await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+        setFaceApiLoaded(true);
+        console.log('Modelos de face-api.js cargados con éxito');
+      } catch (err) {
+        console.error('Error cargando modelos face-api:', err);
+      } finally {
+        setLoadingModels(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).faceapi) {
+      initFaceApi();
+    }
+  }, []);
+
+  // Migración silenciosa de rostro si tiene foto de perfil pero no embedding
+  useEffect(() => {
+    if (faceApiLoaded && user && user.profilePicture && !(user as any).face_embedding) {
+      const migrateFace = async () => {
+        try {
+          const faceapi = (window as any).faceapi;
+          const img = new (window as any).Image();
+          img.src = user.profilePicture!;
+          img.crossOrigin = 'anonymous';
+          img.onload = async () => {
+            const detection = await faceapi.detectSingleFace(img)
+              .withFaceLandmarks()
+              .withFaceDescriptor();
+            if (detection) {
+              const embedding = Array.from(detection.descriptor);
+              const token = localStorage.getItem('nuevaschool_token');
+              const res = await fetch('/api/auth/registrar-rostro', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ embedding })
+              });
+              if (res.ok) {
+                console.log('Migración silenciosa de rostro completada con éxito');
+                updateUser({ ...user, face_embedding: JSON.stringify(embedding) });
+              }
+            } else {
+              console.log('No se detectó un rostro claro en la foto actual para la migración silenciosa.');
+            }
+          };
+        } catch (err) {
+          console.error('Error durante la migración de rostro:', err);
+        }
+      };
+      migrateFace();
+    }
+  }, [faceApiLoaded, user]);
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         const img = new (window as any).Image();
-        img.onload = () => {
+        img.onload = async () => {
           const canvas = document.createElement('canvas');
-          const max_size = 200; // Suficiente para un avatar redondo
+          const max_size = 400; // Mejor resolución para detectar facciones faciales
           let width = img.width;
           let height = img.height;
 
@@ -53,12 +121,44 @@ export default function MiPerfilPage() {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
             
             if (!user) return;
             
             const token = typeof window !== 'undefined' ? localStorage.getItem('nuevaschool_token') : null;
             
+            // Si face-api.js está cargado, intentar extraer el descriptor de rostro
+            let faceEmbeddingVal: string | null = null;
+            if (faceApiLoaded) {
+              const faceapi = (window as any).faceapi;
+              toast.loading('Analizando rostro en la foto...', { id: 'face-load' });
+              
+              try {
+                // Crear un objeto imagen para face-api
+                const faceImg = new (window as any).Image();
+                faceImg.src = compressedBase64;
+                await new Promise((resolve) => { faceImg.onload = resolve; });
+                
+                const detection = await faceapi.detectSingleFace(faceImg)
+                  .withFaceLandmarks()
+                  .withFaceDescriptor();
+                  
+                toast.dismiss('face-load');
+                
+                if (detection) {
+                  faceEmbeddingVal = JSON.stringify(Array.from(detection.descriptor));
+                  toast.success('Rostro detectado correctamente. ¡Inicio de sesión facial habilitado!');
+                } else {
+                  toast.warning('No se detectó un rostro claro en la imagen. No podrás iniciar sesión con cámara.');
+                }
+              } catch (err) {
+                toast.dismiss('face-load');
+                console.error('Error al detectar rostro:', err);
+              }
+            }
+            
+            toast.loading('Guardando foto de perfil...', { id: 'upload-load' });
+
             // Realizar la actualización directamente en el servidor
             fetch(`/api/usuarios/${userId}`, {
               method: 'PUT',
@@ -72,6 +172,7 @@ export default function MiPerfilPage() {
                 apellido: user.apellido,
                 rol: user.rol,
                 profilePicture: compressedBase64,
+                face_embedding: faceEmbeddingVal,
                 codigo: (user as any).codigo || null,
                 carrera: (user as any).carrera || null,
                 ciclo: (user as any).ciclo ? Number((user as any).ciclo) : null,
@@ -80,23 +181,25 @@ export default function MiPerfilPage() {
                 nivel_acceso: (user as any).nivel_acceso || null
               })
             }).then(async (res) => {
+              toast.dismiss('upload-load');
               if (res.ok) {
                 // Actualizar el estado global en memoria de usuarios si está cargado
                 if (appState.usuarios && appState.usuarios.length > 0) {
                   const updatedUsers = appState.usuarios.map(u => 
-                    u.id === userId ? { ...u, profilePicture: compressedBase64 } : u
+                    u.id === userId ? { ...u, profilePicture: compressedBase64, face_embedding: faceEmbeddingVal || undefined } : u
                   );
                   updateAppState({ usuarios: updatedUsers });
                 }
                 
                 // Actualizar el usuario de sesión
-                updateUser({ ...user, profilePicture: compressedBase64 });
-                toast.success('Foto de perfil actualizada y optimizada');
+                updateUser({ ...user, profilePicture: compressedBase64, face_embedding: faceEmbeddingVal || undefined });
+                toast.success('Foto de perfil actualizada con éxito');
               } else {
                 const errData = await res.json().catch(() => ({}));
                 toast.error(errData.detail || 'No se pudo guardar la foto de perfil en el servidor');
               }
             }).catch((err) => {
+              toast.dismiss('upload-load');
               console.error('Error uploading photo:', err);
               toast.error('Error de conexión al guardar la foto de perfil');
             });
@@ -230,6 +333,21 @@ export default function MiPerfilPage() {
                 <p className="text-xs text-gray-500">
                   Sube una imagen (JPG, PNG) de máximo 2MB.
                 </p>
+                <div className="mt-4 flex items-center justify-between border-t pt-4">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">Reconocimiento Facial</h4>
+                    <p className="text-xs text-slate-500">
+                      {(user as any).face_embedding 
+                        ? '✅ Rostro registrado. Puedes iniciar sesión con tu cámara.' 
+                        : '❌ Rostro no registrado. Sube una foto de perfil clara.'}
+                    </p>
+                  </div>
+                  {!faceApiLoaded && (
+                    <span className="text-[10px] text-slate-400">
+                      {loadingModels ? 'Cargando modelos IA...' : 'Modelos listos'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>
@@ -281,6 +399,11 @@ export default function MiPerfilPage() {
         </Card>
       </div>
       {validationModal}
+      <Script 
+        src="/js/face-api.min.js" 
+        strategy="lazyOnload" 
+        onLoad={initFaceApi}
+      />
     </MainLayout>
   );
 }
