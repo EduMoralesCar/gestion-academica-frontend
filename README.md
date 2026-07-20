@@ -42,6 +42,7 @@ El proyecto utiliza una arquitectura de base de datos local (IndexedDB a través
 - **Historial Académico:** Visualización en tiempo real del promedio de sus cursos.
 - **Aulas Virtuales:** Acceso a temarios, entrega de tareas en PDF y visualización de notas.
 - **Reporte de Asistencias:** Verificación de su estado en cada clase dictada.
+- **Inicio de Sesión Holográfico:** Acceso biométrico interactivo con escaneo facial por cámara web en tiempo real, incluyendo barrido láser, retícula de enfoque y mapeo de contornos del rostro (landmarks) en vivo.
 
 ---
 
@@ -100,5 +101,3 @@ npx unlighthouse --site https://nuevaschool.onrender.com/
 ```
 
 ---
-
-
